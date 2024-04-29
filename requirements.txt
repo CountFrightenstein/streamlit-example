@@ -1,5 +1,13 @@
 altair
-pandas
 streamlit
-joblib
 numpy
+catboost==1.2.3
+duckdb==0.10.1
+google_api_python_client==2.118.0
+joblib==1.2.0
+numpy==1.24.1
+pandas==2.0.3
+protobuf==5.26.1
+scikit_learn==1.2.2
+tkcalendar==1.6.1
+xgboost==2.0.3

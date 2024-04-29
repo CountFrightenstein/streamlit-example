@@ -6,6 +6,11 @@ import time
 import os
 import csv
 import re
+import duckdb
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
 
 # Example usage
 # Names of the models used in the ensemble
@@ -62,6 +67,8 @@ def data_processor(df):
     
     # Splitting dataset into features and target variable
     X = df[features]
+    X['order_quantity'] = X['order_quantity'].astype(int)
+    X['prints_in_drop'] = X['prints_in_drop'].astype(int)
     preprocessor = load('preprocessor/preprocessor.joblib')    
     #columns = preprocessor.get_feature_names_out()
     #X_new_transformed_df = pd.DataFrame(X_new_transformed, columns=columns)
@@ -179,18 +186,34 @@ def on_drop_time_holiday_focus_out(event):
         else:
             combobox.set('')
 
+# Function to normalize strings
+def normalize_string(s):
+    return re.sub(r'\W+', '', s.lower())
+
+# Function to get unique values from a CSV file
+def get_unique_values(file_path):
+    with open(file_path, mode='r', newline='', encoding='utf-8') as file:
+        reader = csv.reader(file)
+        values = set(row[0] for row in reader)
+        return sorted(list(values))
+
+# Function to add a new color to the list
 def add_new_color(new_color):
     unique_main_colors.append(new_color)
     
     with open(main_colors_file_path, mode='a', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
         writer.writerow([new_color])
+
+# Function to add a new design category to the list
 def add_new_designcat(new_cat):
     unique_design_cats.append(new_cat)
     
     with open(design_cats_file_path, mode='a', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
         writer.writerow([new_cat])
+
+# Function to add a new design element to the list
 def add_new_element(new_element):
     unique_design_elements.append(new_element)
     
@@ -198,6 +221,7 @@ def add_new_element(new_element):
         writer = csv.writer(file)
         writer.writerow([new_element])
 
+# Function to add a new print to the list
 def add_new_print(new_print):
     unique_prints.append(new_print)
     
@@ -205,6 +229,7 @@ def add_new_print(new_print):
         writer = csv.writer(file)
         writer.writerow([new_print])
 
+# Function to add a new drop time holiday to the list
 def add_new_drop_time_holiday(new_drop_time_holiday):
     unique_drop_time_holidays.append(new_drop_time_holiday)
     
@@ -212,23 +237,14 @@ def add_new_drop_time_holiday(new_drop_time_holiday):
         writer = csv.writer(file)
         writer.writerow([new_drop_time_holiday])
 
-def get_unique_values(file_path):
-    with open(file_path, mode='r', newline='', encoding='utf-8') as file:
-        reader = csv.reader(file)
-        values = set(row[0] for row in reader)
-        return sorted(list(values))
-
-def normalize_string(s):
-    return re.sub(r'\W+', '', s.lower())
-
+# Function to validate order quantity
 def validate_order_quantity(input):
     if input.isdigit():
         return True
     else:
         return False
 
-st.title("Bums & Roses Buy Model")
-
+# Load unique values from CSV files
 prints_file_path = 'prints.csv'
 unique_prints = get_unique_values(prints_file_path)
 
@@ -251,33 +267,58 @@ confidence_scores = ['A', 'B', 'C']
 yes_no_options = ['Yes', 'No']
 gender_options = ['Boy', 'Girl', 'Neutral']
 
+# Title
+st.title("Bums & Roses Buy Model")
+
+# Define entries and columns
 entries = []
 columns = ['actual_drop_date', 'print', 'season', 'drop_time_holiday', 'print_gender', 'main_color', 'designcat', 'designelement', 'order_quantity', 'confidence_score', 'convertible_romper_in_drop', 'pajama_set_in_drop', 'romper_in_drop','footie_in_drop', 'prints_in_drop']
 column_titles = ['Drop Date', 'Print', 'Season', 'Holiday', 'Gender', 'Main Color', 'Design Category', 'Design Element', 'Total Estimated Buy', 'Confidence', 'Convertible Romper in Drop?', 'Pajama Set in Drop?', 'Romper in Drop', 'Footie in Drop', 'Total Prints in Buy']
 
+# Iterate over columns to create input fields
 for column, title in zip(columns, column_titles):
     if column == 'actual_drop_date':
         entry = st.date_input(title, key=column)
     elif column == 'print':
-        entry = st.selectbox(title, unique_prints, key=column)
+        entry = st.selectbox(title, unique_prints + ['Add New'], key=column)
+        if entry == 'Add New':
+            new_print = st.text_input("Enter New Print")
+            if st.button("Add"):
+                add_new_print(new_print)
     elif column == 'drop_time_holiday':
-        entry = st.selectbox(title, unique_drop_time_holidays, key=column)
+        entry = st.selectbox(title, unique_drop_time_holidays + ['Add New'], key=column)
+        if entry == 'Add New':
+            new_holiday = st.text_input("Enter New Holiday")
+            if st.button("Add"):
+                add_new_drop_time_holiday(new_holiday)
     elif column == 'main_color':
-        entry = st.selectbox(title, unique_main_colors, key=column)
+        entry = st.selectbox(title, unique_main_colors + ['Add New'], key=column)
+        if entry == 'Add New':
+            new_color = st.text_input("Enter New Color")
+            if st.button("Add"):
+                add_new_color(new_color)
     elif column == 'designcat':
-        entry = st.selectbox(title, unique_design_cats, key=column)
+        entry = st.selectbox(title, unique_design_cats + ['Add New'], key=column)
+        if entry == 'Add New':
+            new_cat = st.text_input("Enter New Design Category")
+            if st.button("Add"):
+                add_new_designcat(new_cat)
     elif column == 'designelement':
-        entry = st.selectbox(title, unique_design_elements, key=column)
+        entry = st.selectbox(title, unique_design_elements + ['Add New'], key=column)
+        if entry == 'Add New':
+            new_element = st.text_input("Enter New Design Element")
+            if st.button("Add"):
+                add_new_element(new_element)
     elif column == 'season':
         entry = st.selectbox(title, unique_seasons, key=column)
     elif column == 'order_quantity':
-        entry = st.number_input(title, key=column)
+        entry = st.number_input(title, key=column, value=1, step=1)
     elif column == 'confidence_score':
         entry = st.selectbox(title, confidence_scores, key=column)
-    elif column == 'convertible_romper_in_drop' or column == 'pajama_set_in_drop' or column == 'romper_in_drop' or column == 'footie_in_drop':
+    elif column in ['convertible_romper_in_drop', 'pajama_set_in_drop', 'romper_in_drop', 'footie_in_drop']:
         entry = st.radio(title, options=yes_no_options, key=column)
     elif column == 'prints_in_drop':
-        entry = st.number_input(title, key=column)
+        entry = st.number_input(title, key=column, value=1, step=1)
     elif column == 'print_gender':
         entry = st.selectbox(title, gender_options, key=column)
     else:
@@ -285,6 +326,7 @@ for column, title in zip(columns, column_titles):
 
     entries.append((column, entry))
 
+# Run Model button
 if st.button("Run Model"):
     # Processing the data
     df = pd.DataFrame(columns=[col for col, _ in entries])
@@ -293,8 +335,20 @@ if st.button("Run Model"):
             df[col] = [entry]
         elif isinstance(entry, (int, float)):
             df[col] = [entry]
+        elif col == 'actual_drop_date':
+            # Convert string date to pandas Timestamp
+            df[col] = [entry]
         elif isinstance(entry, str):
             df[col] = [entry]
+
+    conn = duckdb.connect('database/bums_and_roses.duckdb')
+    conn.execute("""
+            CREATE OR REPLACE TABLE  new_drop as select * from df
+        """)
+
+    with open('sql/derive-combos.sql') as f:
+        query = f.read()
+        df = conn.execute(query).fetch_df()
 
     X = data_processor(df)
     results = load_and_predict(model_names, X)
@@ -310,5 +364,9 @@ if st.button("Run Model"):
     df['buy_proportion'] = (df['buy_proportion'] * 100).round(2).astype(str) + '%'
     df = df.sort_values(by=['product_type', 'size_sort'])[['actual_drop_date', 'print', 'season', 'drop_time_holiday', 'print_gender', 'main_color', 'designcat', 'designelement', 'product_type', 'variant', 'returning_cohort', 'first_time_cohort', 'confidence_score', 'sales_projection', 'buy_proportion', 'implied_buy']]
 
-    # Display the DataFrame in a new window
-    display_dataframe(df)
+    # Display the DataFrame
+    st.dataframe(df)
+
+    # Export to Excel button
+    if st.button("Export to Excel"):
+        export_dataframe_to_excel(df)
