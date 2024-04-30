@@ -11,29 +11,46 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
+import zipfile
+import os
+import base64
 
 # Example usage
 # Names of the models used in the ensemble
 model_names = ['Linear_Regression', 'Ridge', 'Lasso', 'ElasticNet', 'SVR', 'Decision_Tree', 
                'Random_Forest', 'Gradient_Boosting', 'XGBoost', 'CatBoost', 
                'MLP_Neural_Network']
+def unzip_file(zip_file_path, extract_to):
+    # Create the extraction directory if it doesn't exist
+    os.makedirs(extract_to, exist_ok=True)
+
+    # Open the zip file
+    with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+        # Extract all the contents into the extraction directory
+        zip_ref.extractall(extract_to)
+
 
 def export_dataframe_to_excel(df):
     df['buy_proportion'] = df['buy_proportion'].str.rstrip('%').astype(float) / 100.0
     print_value = df.iloc[0]['print']
     actual_drop_date = df.iloc[0]['actual_drop_date'].strftime('%Y-%m-%d')
-    # Ask the user for the location and name of the Excel file to save
     unix_timestamp = int(time.time())
     default_filename = f"{print_value}_{str(actual_drop_date)}_{str(unix_timestamp)}.xlsx"
+    
+    # Save DataFrame to Excel file
+    excel_path = os.path.join('exports', default_filename)
+    try:
+        df.to_excel(excel_path, index=False)
+    except Exception as e:
+        st.error(f"Failed to export the data: {e}")
 
-    # Ask the user for the location and name of the Excel file to save, suggesting the default filename
-    file_path = st.file_uploader("Save As", type=["xlsx"], accept_multiple_files=False, key="file_uploader")
-    if file_path:  # Check if a file path was selected
-        try:
-            df.to_excel(file_path, index=False)
-            st.success("The data was exported successfully to Excel.")
-        except Exception as e:
-            st.error(f"Failed to export the data: {e}")
+    # Generate download link for the user
+    with open(excel_path, "rb") as f:
+        data = f.read()
+        b64 = base64.b64encode(data).decode()
+        href = f'<a href="data:file/xlsx;base64,{b64}" download="{default_filename}">Download Excel file</a>'
+        st.markdown(href, unsafe_allow_html=True)
+
 
 def display_dataframe(df):
     # Display the DataFrame
@@ -340,7 +357,11 @@ if st.button("Run Model"):
             df[col] = [entry]
         elif isinstance(entry, str):
             df[col] = [entry]
+    # Example usage
+        zip_file_path = 'database/bums_and_roses.duckdb.zip'
+        extract_to = 'database'
 
+        unzip_file(zip_file_path, extract_to)
     conn = duckdb.connect('database/bums_and_roses.duckdb')
     conn.execute("""
             CREATE OR REPLACE TABLE  new_drop as select * from df
@@ -370,3 +391,4 @@ if st.button("Run Model"):
     # Export to Excel button
     if st.button("Export to Excel"):
         export_dataframe_to_excel(df)
+    # Provide a download button for the user

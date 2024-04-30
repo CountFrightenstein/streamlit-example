@@ -11,3 +11,4 @@ protobuf==5.26.1
 scikit_learn==1.2.2
 tkcalendar==1.6.1
 xgboost==2.0.3
+gunzip
